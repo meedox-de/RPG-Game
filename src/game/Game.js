@@ -28,7 +28,6 @@ export class Game {
         
         // Komponenten erstellen
         this.world = new World(this.scene, this.physicsWorld);
-        this.player = new Player(this.scene, this.camera, this.physicsWorld);
         this.saveManager = new SaveManager();
         
         this.setupLighting();
@@ -74,12 +73,49 @@ export class Game {
         });
     }
 
-    init() {
-        const savedState = this.saveManager.loadGame();
-        if (savedState) {
-            this.player.setPosition(savedState.playerPosition);
+    async initializePlayer(playerName) {
+        try {
+            this.saveManager.setPlayerId(playerName);
+            this.player = new Player(this.scene, this.camera, this.physicsWorld);
+            this.player.setPosition({ x: 0, y: 0.5, z: 0 });
+
+            const savedState = await this.saveManager.loadGame();
+            if (savedState && savedState.playerPosition) {
+                this.player.setPosition(savedState.playerPosition);
+            }
+
+            this.setupSaveButton();
+        } catch (error) {
+            console.error('Fehler bei der Spielerinitialisierung:', error);
+            // Hier könnte eine Fehlerbehandlung implementiert werden
         }
-        this.animate();
+    }
+
+    async init() {
+        try {
+            // Zuerst den Spieler initialisieren
+            await this.initializePlayer('default_player');  // Hier können Sie später einen Login-Dialog implementieren
+            
+            // Dann die Welt laden
+            const savedState = await this.saveManager.loadGame();
+            if (savedState) {
+                this.world.loadWorldObjects(savedState);
+            } else {
+                this.world.createBorderTrees();
+                this.world.generateTrees();
+                this.world.generateHouses();
+            }
+
+            // Kamera positionieren
+            this.camera.position.set(0, 10, 20);
+            this.camera.lookAt(0, 0, 0);
+
+            // Animation starten
+            this.animate();
+        } catch (error) {
+            console.error('Fehler beim Initialisieren:', error);
+            throw error;
+        }
     }
 
     animate() {

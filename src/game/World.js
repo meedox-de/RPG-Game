@@ -12,7 +12,7 @@ export class World {
         this.houses = [];
         this.trees = [];
         
-        this.init();
+        this.createGround(); // Nur den Boden erstellen
     }
 
     init() {

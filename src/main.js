@@ -1,6 +1,9 @@
 import { Game } from './game/Game.js';
 
-window.addEventListener('DOMContentLoaded', () => {
+// Warte auf DOM-Load
+document.addEventListener('DOMContentLoaded', function() {
     const game = new Game();
-    game.init();
+    game.init().catch(error => {
+        console.error('Fehler beim Initialisieren des Spiels:', error);
+    });
 });
