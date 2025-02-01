@@ -94,17 +94,12 @@ export class Game {
     async init() {
         try {
             // Zuerst den Spieler initialisieren
-            await this.initializePlayer('default_player');  // Hier können Sie später einen Login-Dialog implementieren
+            await this.initializePlayer('default_player');
             
-            // Dann die Welt laden
-            const savedState = await this.saveManager.loadGame();
-            if (savedState) {
-                this.world.loadWorldObjects(savedState);
-            } else {
-                this.world.createBorderTrees();
-                this.world.generateTrees();
-                this.world.generateHouses();
-            }
+            // Welt erstellen (immer neu generieren)
+            this.world.createBorderTrees();
+            this.world.generateTrees();
+            this.world.generateHouses();
 
             // Kamera positionieren
             this.camera.position.set(0, 10, 20);

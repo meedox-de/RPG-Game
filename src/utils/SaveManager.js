@@ -1,6 +1,6 @@
 export class SaveManager {
     constructor() {
-        this.apiUrl = 'http://pokemon-clon.local/api/save_game.php';
+        this.apiUrl = 'http://pokemon-clon.local';
         this.playerId = null;
         this.isLoading = false;
     }
@@ -14,16 +14,13 @@ export class SaveManager {
             throw new Error('Kein Spieler angemeldet');
         }
 
-        // Verhindere doppeltes Laden
         if (this.isLoading) {
-            console.log('Lade-Vorgang läuft bereits...');
             return null;
         }
 
         this.isLoading = true;
 
         try {
-            console.log('Lade Spiel vom Server für Player:', this.playerId);
             const response = await fetch(`${this.apiUrl}?action=load&playerId=${encodeURIComponent(this.playerId)}`);
 
             if (!response.ok) {
@@ -36,11 +33,9 @@ export class SaveManager {
                 throw new Error(result.error || 'Unbekannter Serverfehler');
             }
 
-            console.log('Geladene Daten:', result.gameState);
             return this.normalizeGameState(result.gameState);
 
         } catch (error) {
-            console.error('Fehler beim Laden:', error);
             return this.getDefaultGameState();
         } finally {
             this.isLoading = false;
@@ -53,14 +48,16 @@ export class SaveManager {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}?action=save`, {
+            const response = await fetch(`${this.apiUrl}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     playerId: this.playerId,
-                    playerPosition: gameState.playerPosition
+                    gameState: {
+                        playerPosition: gameState.playerPosition
+                    }
                 })
             });
 
@@ -69,23 +66,28 @@ export class SaveManager {
             }
 
             const result = await response.json();
+            
             if (!result.success) {
                 throw new Error(result.error || 'Unbekannter Serverfehler');
             }
 
-            console.log('Spielstand erfolgreich gespeichert:', result);
+            console.log('Gespeichert');
+            return true;
+
         } catch (error) {
-            console.error('Fehler beim Speichern:', error);
+            throw error;
         }
     }
 
     normalizeGameState(gameState) {
-        // Hier die Logik zur Normalisierung des Spielstands implementieren
-        return gameState;
+        return {
+            playerPosition: gameState.playerPosition || { x: 0, y: 0.5, z: 0 }
+        };
     }
 
     getDefaultGameState() {
-        // Hier die Logik für den Standard-Spielstand implementieren
-        return {};
+        return {
+            playerPosition: { x: 0, y: 0.5, z: 0 }
+        };
     }
 }

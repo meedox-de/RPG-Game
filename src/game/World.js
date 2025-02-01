@@ -11,6 +11,7 @@ export class World {
         this.worldSize = Constants.WORLD.SIZE;
         this.houses = [];
         this.trees = [];
+        this.borderTrees = [];  // Neue Array für Grenzbäume
         
         this.createGround(); // Nur den Boden erstellen
     }
@@ -41,9 +42,16 @@ export class World {
             });
         }
 
-        // Bäume laden
+        // Normale Bäume laden
         if (savedState.trees) {
             savedState.trees.forEach(tree => {
+                this.createTree(tree.x, tree.z, tree.height);
+            });
+        }
+
+        // Grenzbäume laden
+        if (savedState.borderTrees) {
+            savedState.borderTrees.forEach(tree => {
                 this.createTree(tree.x, tree.z, tree.height);
             });
         }
@@ -79,46 +87,118 @@ export class World {
     }
 
     createBorderTrees() {
-        const borderOffset = this.blockSize * 2;
+        const spacing = 2; // Abstand zwischen den Bäumen
+        const borderOffset = 1; // Abstand vom Rand
         
-        for(let x = -this.worldSize/2; x <= this.worldSize/2; x += this.blockSize * 2) {
-            this.createTree(x, -this.worldSize/2 + borderOffset);
-            this.createTree(x, this.worldSize/2 - borderOffset);
-            this.createTree(-this.worldSize/2 + borderOffset, x);
-            this.createTree(this.worldSize/2 - borderOffset, x);
+        // Äußere Grenzen der Welt
+        const worldBorder = this.worldSize / 2;
+        
+        // Bäume entlang der X-Achse
+        for (let x = -worldBorder + borderOffset; x <= worldBorder - borderOffset; x += spacing) {
+            // Vordere Grenze (Z = -worldBorder)
+            const frontTree = this.createTree(x, -worldBorder + borderOffset, 3);
+            this.borderTrees.push({ x: x, z: -worldBorder + borderOffset, height: 3 });
+            
+            // Hintere Grenze (Z = worldBorder)
+            const backTree = this.createTree(x, worldBorder - borderOffset, 3);
+            this.borderTrees.push({ x: x, z: worldBorder - borderOffset, height: 3 });
+        }
+        
+        // Bäume entlang der Z-Achse
+        for (let z = -worldBorder + borderOffset; z <= worldBorder - borderOffset; z += spacing) {
+            // Linke Grenze (X = -worldBorder)
+            const leftTree = this.createTree(-worldBorder + borderOffset, z, 3);
+            this.borderTrees.push({ x: -worldBorder + borderOffset, z: z, height: 3 });
+            
+            // Rechte Grenze (X = worldBorder)
+            const rightTree = this.createTree(worldBorder - borderOffset, z, 3);
+            this.borderTrees.push({ x: worldBorder - borderOffset, z: z, height: 3 });
         }
     }
 
-    createTree(x, z, height = null) {
-        height = height || 2 + Math.random() * 2;
-        const geometry = new THREE.ConeGeometry(1, height, 8);
-        const material = new THREE.MeshStandardMaterial({ color: 0x2d5a27 });
+    createHouse(x, z, width = 2, height = 2, depth = 2) {
+        const house = {
+            x: x,
+            z: z,
+            width: width,
+            height: height,
+            depth: depth
+        };
         
-        const tree = new THREE.Mesh(geometry, material);
-        tree.position.set(x, height/2, z);
-        tree.castShadow = true;
-        tree.receiveShadow = true;
-        this.scene.add(tree);
-
-        // Verbesserte Physik für den Baum
-        const treeBody = new CANNON.Body({
+        // Erstelle 3D-Objekt
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0x8B4513,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, height / 2, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        
+        // Füge Physik hinzu
+        const shape = new CANNON.Box(new CANNON.Vec3(width / 2, height / 2, depth / 2));
+        const body = new CANNON.Body({
             mass: 0,
-            shape: new CANNON.Cylinder(1, 1, height, 8),
-            material: new CANNON.Material({
-                friction: 0.5,
-                restitution: 0.3
-            })
+            position: new CANNON.Vec3(x, height / 2, z),
+            shape: shape
         });
-        treeBody.position.set(x, height/2, z);
-        this.physicsWorld.addBody(treeBody);
         
-        // Kollisionsgruppe für Bäume
-        treeBody.collisionFilterGroup = 2;
-        treeBody.collisionFilterMask = 1; // Kollidiert nur mit Spieler
+        this.scene.add(mesh);
+        this.physicsWorld.addBody(body);
+        
+        house.mesh = mesh;
+        house.body = body;
+        this.houses.push(house);
+        
+        return house;
+    }
 
-        this.trees.push({
-            x, z, height
+    createTree(x, z, height = 3) {
+        const tree = {
+            x: x,
+            z: z,
+            height: height
+        };
+        
+        // Stamm
+        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, height);
+        const trunkMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x4d2926,
+            roughness: 0.8
         });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.set(x, height / 2, z);
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+
+        // Baumkrone
+        const crownGeometry = new THREE.ConeGeometry(1, 2, 8);
+        const crownMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x0b5345,
+            roughness: 0.7
+        });
+        const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+        crown.position.set(0, 1.5, 0);
+        trunk.add(crown);
+        
+        // Füge Physik hinzu
+        const shape = new CANNON.Cylinder(0.2, 0.2, height, 8);
+        const body = new CANNON.Body({
+            mass: 0,
+            position: new CANNON.Vec3(x, height / 2, z),
+            shape: shape
+        });
+        
+        this.scene.add(trunk);
+        this.physicsWorld.addBody(body);
+        
+        tree.mesh = trunk;
+        tree.body = body;
+        this.trees.push(tree);
+        
+        return tree;
     }
 
     generateTrees() {
@@ -140,54 +220,21 @@ export class World {
         }
     }
 
-    createHouse(x, z, width = null, height = null, depth = null) {
-        width = width || 3 + Math.random() * 2;
-        height = height || 4 + Math.random() * 2;
-        depth = depth || 3 + Math.random() * 2;
-
-        // Hauswände
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const material = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-        
-        const house = new THREE.Mesh(geometry, material);
-        house.position.set(x, height/2, z);
-        house.castShadow = true;
-        house.receiveShadow = true;
-        this.scene.add(house);
-
-        // Dach
-        const roofGeometry = new THREE.ConeGeometry(Math.max(width, depth)/1.5, height/2, 4);
-        const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-        const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-        roof.position.set(x, height + height/4, z);
-        roof.castShadow = true;
-        this.scene.add(roof);
-
-        // Verbesserte Physik für das Haus
-        const houseBody = new CANNON.Body({
-            mass: 0,
-            shape: new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2)),
-            material: new CANNON.Material({
-                friction: 0.5,
-                restitution: 0.3
-            })
-        });
-        houseBody.position.set(x, height/2, z);
-        this.physicsWorld.addBody(houseBody);
-        
-        // Kollisionsgruppe für Häuser
-        houseBody.collisionFilterGroup = 2;
-        houseBody.collisionFilterMask = 1; // Kollidiert nur mit Spieler
-
-        this.houses.push({
-            x, z, width, height, depth
-        });
-    }
-
     getWorldState() {
         return {
-            houses: this.houses,
-            trees: this.trees
+            houses: this.houses.map(house => ({
+                x: house.x,
+                z: house.z,
+                width: house.width,
+                height: house.height,
+                depth: house.depth
+            })),
+            trees: this.trees.map(tree => ({
+                x: tree.x,
+                z: tree.z,
+                height: tree.height
+            })),
+            borderTrees: this.borderTrees
         };
     }
 }
