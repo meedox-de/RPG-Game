@@ -10,40 +10,36 @@ export class SaveManager {
     }
 
     async loadGame() {
+        try {
+            const response = await fetch(`${this.apiUrl}?action=load`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            return {
+                houses: result.gameState.houses || [],
+                trees: result.gameState.trees || [],
+                borderTrees: result.gameState.borderTrees || []
+            };
+        } catch (error) {
+            return this.getDefaultGameState();
+        }
+    }
+
+    async loadPlayerPosition() {
         if (!this.playerId) {
             throw new Error('Kein Spieler angemeldet');
         }
 
-        if (this.isLoading) {
-            return null;
-        }
-
-        this.isLoading = true;
-
         try {
-            const response = await fetch(`${this.apiUrl}?action=load&playerId=${encodeURIComponent(this.playerId)}`);
-
+            const response = await fetch(`${this.apiUrl}?action=loadPlayer&playerId=${encodeURIComponent(this.playerId)}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
             const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Unbekannter Serverfehler');
-            }
-
-            return {
-                playerPosition: result.gameState?.playerPosition || { x: 0, y: 0.5, z: 0 },
-                houses: result.gameState?.houses || [],
-                trees: result.gameState?.trees || [],
-                borderTrees: result.gameState?.borderTrees || []
-            };
-
+            return result.gameState?.playerPosition || { x: 0, y: 0.5, z: 0 };
         } catch (error) {
-            return this.getDefaultGameState();
-        } finally {
-            this.isLoading = false;
+            return { x: 0, y: 0.5, z: 0 };
         }
     }
 

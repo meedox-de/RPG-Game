@@ -22,17 +22,14 @@ export class Game {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
         
-        // Physik-Welt initialisieren
         this.physicsWorld = new CANNON.World();
         this.physicsWorld.gravity.set(0, Constants.PHYSICS.GRAVITY, 0);
         
-        // Komponenten erstellen
         this.world = new World(this.scene, this.physicsWorld);
         this.saveManager = new SaveManager();
         
         this.setupLighting();
         this.setupEventListeners();
-        this.setupSaveButton();
     }
 
     setupLighting() {
@@ -77,26 +74,24 @@ export class Game {
         try {
             this.saveManager.setPlayerId(playerName);
             this.player = new Player(this.scene, this.camera, this.physicsWorld);
-            this.player.setPosition({ x: 0, y: 0.5, z: 0 });
-
-            const savedState = await this.saveManager.loadGame();
-            if (savedState && savedState.playerPosition) {
-                this.player.setPosition(savedState.playerPosition);
+            
+            // Lade Spielerposition
+            const playerState = await this.saveManager.loadPlayerPosition();
+            if (playerState) {
+                this.player.setPosition(playerState);
+            } else {
+                this.player.setPosition({ x: 0, y: 0.5, z: 0 });
             }
 
             this.setupSaveButton();
         } catch (error) {
             console.error('Fehler bei der Spielerinitialisierung:', error);
-            // Hier könnte eine Fehlerbehandlung implementiert werden
         }
     }
 
     async init() {
         try {
-            // Zuerst den Spieler initialisieren
-            await this.initializePlayer('default_player');
-            
-            // Spielstand laden
+            // Zuerst die Welt mit Häusern und Bäumen laden
             const savedState = await this.saveManager.loadGame();
             
             // Häuser aus der DB laden
@@ -120,9 +115,12 @@ export class Game {
                 });
             }
 
-            // Kamera positionieren
+            // Kamera initial positionieren
             this.camera.position.set(0, 10, 20);
             this.camera.lookAt(0, 0, 0);
+
+            // Zeige Login-Dialog
+            await this.showLoginDialog();
 
             // Animation starten
             this.animate();
@@ -130,6 +128,31 @@ export class Game {
             console.error('Fehler beim Initialisieren:', error);
             throw error;
         }
+    }
+
+    async showLoginDialog() {
+        return new Promise((resolve) => {
+            const dialog = document.createElement('div');
+            dialog.className = 'login-dialog';
+            dialog.innerHTML = `
+                <div class="login-content">
+                    <h2>Spielername eingeben</h2>
+                    <input type="text" id="playerName" placeholder="Name eingeben">
+                    <button id="startGame">Spiel starten</button>
+                </div>
+            `;
+            document.body.appendChild(dialog);
+
+            document.getElementById('startGame').addEventListener('click', async () => {
+                const playerName = document.getElementById('playerName').value;
+                if (playerName) {
+                    await this.initializePlayer(playerName);
+                    dialog.remove();
+                    this.setupSaveButton();
+                    resolve();
+                }
+            });
+        });
     }
 
     animate() {

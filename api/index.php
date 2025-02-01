@@ -21,77 +21,49 @@ function debug_to_file($message) {
 try {
     $db = new PDO(
         'mysql:host=localhost;dbname=rpg-game',
-        'root', // Dein Datenbankbenutzer
-        '',     // Dein Datenbankpasswort
-        array(
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'
-        )
+        'root',
+        '',
+        array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
     );
 
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        if (!isset($_GET['playerId'])) {
-            throw new Exception('Player ID nicht angegeben');
-        }
+    // Aktion aus der URL holen
+    $action = $_GET['action'] ?? '';
 
-        $playerId = $_GET['playerId'];
-        
-        // Spielerposition laden
-        $stmt = $db->prepare("SELECT player_position FROM game_saves WHERE player_id = ?");
-        $stmt->execute([$playerId]);
-        $result = $stmt->fetch();
+    if ($action === 'load') {
+        // Lade Welt-Objekte (ohne Spieler)
+        $houses = $db->query("SELECT x, z, width, height, depth FROM houses")->fetchAll();
+        $trees = $db->query("SELECT x, z, height, is_border FROM trees")->fetchAll();
 
-        // Lade alle Häuser
-        $stmt = $db->prepare("SELECT x, z, width, height, depth, color FROM houses");
-        $stmt->execute();
-        $houses = $stmt->fetchAll();
-
-        // Lade alle Bäume
-        $stmt = $db->prepare("SELECT x, z, height, color, is_border FROM trees");
-        $stmt->execute();
-        $trees = $stmt->fetchAll();
-
-        // Verarbeite Bäume
-        $normalTrees = [];
-        $borderTrees = [];
-        foreach ($trees as $tree) {
-            $treeData = [
-                'x' => (float)$tree['x'],
-                'z' => (float)$tree['z'],
-                'height' => (float)$tree['height'],
-                'color' => (int)$tree['color']
-            ];
-            if ($tree['is_border']) {
-                $borderTrees[] = $treeData;
-            } else {
-                $normalTrees[] = $treeData;
-            }
-        }
-
-        // Konvertiere Haustypen
-        $houses = array_map(function($house) {
-            return [
-                'x' => (float)$house['x'],
-                'z' => (float)$house['z'],
-                'width' => (float)$house['width'],
-                'height' => (float)$house['height'],
-                'depth' => (float)$house['depth'],
-                'color' => (int)$house['color']
-            ];
-        }, $houses);
+        $normalTrees = array_filter($trees, fn($tree) => !$tree['is_border']);
+        $borderTrees = array_filter($trees, fn($tree) => $tree['is_border']);
 
         echo json_encode([
             'success' => true,
             'gameState' => [
-                'playerPosition' => $result ? json_decode($result['player_position'], true) : null,
                 'houses' => $houses,
-                'trees' => $normalTrees,
-                'borderTrees' => $borderTrees
+                'trees' => array_values($normalTrees),
+                'borderTrees' => array_values($borderTrees)
             ]
-        ], JSON_NUMERIC_CHECK);
+        ]);
+    } 
+    else if ($action === 'loadPlayer') {
+        if (!isset($_GET['playerId'])) {
+            throw new Exception('Player ID fehlt');
+        }
 
-    } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $playerId = $_GET['playerId'];
+        $stmt = $db->prepare("SELECT player_position FROM game_saves WHERE player_id = ?");
+        $stmt->execute([$playerId]);
+        $result = $stmt->fetch();
+
+        echo json_encode([
+            'success' => true,
+            'gameState' => [
+                'playerPosition' => $result ? json_decode($result['player_position'], true) : null
+            ]
+        ]);
+    }
+    else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = file_get_contents('php://input');
         $data = json_decode($input, true);
         
