@@ -68,17 +68,16 @@ export class Player {
     }
 
     setupControls() {
-        // WASD Steuerung
-        document.addEventListener('keydown', (e) => {
-            this.keysPressed[e.key.toLowerCase()] = true;
-            if (['w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
-                this.targetPosition = null; // Mausklick-Ziel abbrechen bei WASD
-            }
+        window.addEventListener('keydown', (event) => {
+            this.keysPressed[event.key.toLowerCase()] = true;
         });
-        
-        document.addEventListener('keyup', (e) => {
-            this.keysPressed[e.key.toLowerCase()] = false;
+
+        window.addEventListener('keyup', (event) => {
+            this.keysPressed[event.key.toLowerCase()] = false;
         });
+
+        // Neue Methode zum Zurücksetzen aller Tasten
+        this.resetKeys();
 
         // Mausklick-Steuerung
         document.addEventListener('click', (e) => {
@@ -110,6 +109,11 @@ export class Player {
                 )
             );
         });
+    }
+
+    resetKeys() {
+        this.keysPressed = {};
+        this.targetPosition = null;
     }
 
     move(x, y, z) {

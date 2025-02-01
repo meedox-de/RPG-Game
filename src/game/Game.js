@@ -63,10 +63,10 @@ export class Game {
     setupSaveButton() {
         document.getElementById('saveButton').addEventListener('click', () => {
             const gameState = {
-                playerPosition: this.player.getPosition(),
-                ...this.world.getWorldState()
+                playerPosition: this.player.getPosition()
             };
             this.saveManager.saveGame(gameState);
+            this.player.resetKeys();
         });
     }
 
@@ -149,6 +149,7 @@ export class Game {
                     await this.initializePlayer(playerName);
                     dialog.remove();
                     this.setupSaveButton();
+                    this.player.resetKeys();
                     resolve();
                 }
             });
