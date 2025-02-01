@@ -211,13 +211,9 @@ export class World {
     }
 
     generateHouses() {
-        const numberOfHouses = 10;
-        for(let i = 0; i < numberOfHouses; i++) {
-            this.createHouse(
-                (Math.random() - 0.5) * (this.worldSize - 8),
-                (Math.random() - 0.5) * (this.worldSize - 8)
-            );
-        }
+        // Keine zufällige Generierung mehr
+        // Die Häuser werden bereits in der Game-Klasse aus der DB geladen
+        return;
     }
 
     getWorldState() {

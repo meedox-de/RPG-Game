@@ -96,10 +96,29 @@ export class Game {
             // Zuerst den Spieler initialisieren
             await this.initializePlayer('default_player');
             
-            // Welt erstellen (immer neu generieren)
-            this.world.createBorderTrees();
-            this.world.generateTrees();
-            this.world.generateHouses();
+            // Spielstand laden
+            const savedState = await this.saveManager.loadGame();
+            
+            // Häuser aus der DB laden
+            if (savedState.houses) {
+                savedState.houses.forEach(house => {
+                    this.world.createHouse(house.x, house.z, house.width, house.height, house.depth);
+                });
+            }
+
+            // Bäume aus der DB laden
+            if (savedState.trees) {
+                savedState.trees.forEach(tree => {
+                    this.world.createTree(tree.x, tree.z, tree.height);
+                });
+            }
+
+            // Grenzbäume aus der DB laden
+            if (savedState.borderTrees) {
+                savedState.borderTrees.forEach(tree => {
+                    this.world.createTree(tree.x, tree.z, tree.height);
+                });
+            }
 
             // Kamera positionieren
             this.camera.position.set(0, 10, 20);

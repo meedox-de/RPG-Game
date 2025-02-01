@@ -33,7 +33,12 @@ export class SaveManager {
                 throw new Error(result.error || 'Unbekannter Serverfehler');
             }
 
-            return this.normalizeGameState(result.gameState);
+            return {
+                playerPosition: result.gameState?.playerPosition || { x: 0, y: 0.5, z: 0 },
+                houses: result.gameState?.houses || [],
+                trees: result.gameState?.trees || [],
+                borderTrees: result.gameState?.borderTrees || []
+            };
 
         } catch (error) {
             return this.getDefaultGameState();
@@ -81,13 +86,19 @@ export class SaveManager {
 
     normalizeGameState(gameState) {
         return {
-            playerPosition: gameState.playerPosition || { x: 0, y: 0.5, z: 0 }
+            playerPosition: gameState?.playerPosition || { x: 0, y: 0.5, z: 0 },
+            houses: gameState?.houses || [],
+            trees: gameState?.trees || [],
+            borderTrees: gameState?.borderTrees || []
         };
     }
 
     getDefaultGameState() {
         return {
-            playerPosition: { x: 0, y: 0.5, z: 0 }
+            playerPosition: { x: 0, y: 0.5, z: 0 },
+            houses: [],
+            trees: [],
+            borderTrees: []
         };
     }
 }
