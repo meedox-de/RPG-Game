@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Credentials: true');
 
 // Bei OPTIONS-Request sofort beenden (für CORS)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -61,6 +62,17 @@ try {
             'gameState' => [
                 'playerPosition' => $result ? json_decode($result['player_position'], true) : null
             ]
+        ]);
+    }
+    else if ($action === 'getPlayers') {
+        // Hole alle aktiven Spieler
+        $stmt = $db->prepare("SELECT player_id as id, player_position as position FROM game_saves");
+        $stmt->execute();
+        $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'players' => $players
         ]);
     }
     else if ($_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -4,6 +4,7 @@ import { World } from './World.js';
 import { Player } from './Player.js';
 import { SaveManager } from '../utils/SaveManager.js';
 import { Constants } from '../utils/Constants.js';
+import { PlayerManager } from '../utils/PlayerManager.js';
 
 export class Game {
     constructor() {
@@ -27,6 +28,9 @@ export class Game {
         
         this.world = new World(this.scene, this.physicsWorld);
         this.saveManager = new SaveManager();
+        this.playerManager = new PlayerManager(this.scene);
+        this.lastUpdateTime = 0;
+        this.updateInterval = 1000; // 1 Sekunde
         
         this.setupLighting();
         this.setupEventListeners();
@@ -73,6 +77,7 @@ export class Game {
     async initializePlayer(playerName) {
         try {
             this.saveManager.setPlayerId(playerName);
+            this.playerManager.setCurrentPlayerId(playerName);
             this.player = new Player(this.scene, this.camera, this.physicsWorld);
             
             // Lade Spielerposition
@@ -164,6 +169,13 @@ export class Game {
         
         // Spiellogik aktualisieren
         this.player.update();
+        
+        // Andere Spieler aktualisieren (jede Sekunde)
+        const currentTime = Date.now();
+        if (currentTime - this.lastUpdateTime >= this.updateInterval) {
+            this.playerManager.updatePlayers();
+            this.lastUpdateTime = currentTime;
+        }
         
         // Rendern
         this.renderer.render(this.scene, this.camera);

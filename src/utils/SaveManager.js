@@ -1,6 +1,6 @@
 export class SaveManager {
     constructor() {
-        this.apiUrl = 'http://pokemon-clon.local';
+        this.apiUrl = 'http://localhost/RPG-Game/api/index.php';
         this.playerId = null;
         this.isLoading = false;
     }
