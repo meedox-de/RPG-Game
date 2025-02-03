@@ -37,6 +37,31 @@
         #south { bottom: 5px; }
         #east { right: 5px; }
         #west { left: 5px; }
+        #playerNamePopup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            display: none;
+            z-index: 1000;
+        }
+        #playerNamePopup input {
+            margin: 10px 0;
+            padding: 5px;
+            width: 200px;
+        }
+        #playerNamePopup button {
+            padding: 5px 15px;
+            background: #4CAF50;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -56,6 +81,12 @@
         <span class="compass-label" id="south">S</span>
         <span class="compass-label" id="east">E</span>
         <span class="compass-label" id="west">W</span>
+    </div>
+    <div id="playerNamePopup">
+        <h3>Willkommen!</h3>
+        <p>Bitte gib deinen Spielernamen ein:</p>
+        <input type="text" id="playerNameInput" />
+        <button id="submitNameButton">Spielen</button>
     </div>
 </body>
 </html> 

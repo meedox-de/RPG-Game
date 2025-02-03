@@ -42,6 +42,32 @@ function debug_to_file($message) {
 try {
     // GET Request: Lade die Welt
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        // Wenn ein Spielername übergeben wurde
+        if (isset($_GET['player'])) {
+            $stmt = $pdo->prepare('SELECT * FROM players WHERE name = ?');
+            $stmt->execute([$_GET['player']]);
+            $player = $stmt->fetch();
+            
+            if (!$player) {
+                // Neuen Spieler erstellen
+                $stmt = $pdo->prepare('INSERT INTO players (name, x, y, z, rotation_y) VALUES (?, 0, 5, 0, 0)');
+                $stmt->execute([$_GET['player']]);
+                $player = [
+                    'name' => $_GET['player'],
+                    'x' => 0,
+                    'y' => 5,
+                    'z' => 0,
+                    'rotation_y' => 0
+                ];
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'player' => $player
+            ]);
+            exit;
+        }
+        
         $stmt = $pdo->query('SELECT x, y, z, type FROM blocks');
         $blocks = $stmt->fetchAll();
         echo json_encode([
@@ -51,6 +77,23 @@ try {
     }
     // POST Request: Speichere die Welt
     else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Spielerposition aktualisieren
+        if (isset($_GET['updatePlayer'])) {
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($data['name']) || !isset($data['x']) || !isset($data['y']) || !isset($data['z']) || !isset($data['rotation_y'])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Unvollständige Daten']);
+                exit;
+            }
+            
+            $stmt = $pdo->prepare('UPDATE players SET x = ?, y = ?, z = ?, rotation_y = ? WHERE name = ?');
+            $success = $stmt->execute([$data['x'], $data['y'], $data['z'], $data['rotation_y'], $data['name']]);
+            
+            echo json_encode(['success' => $success]);
+            exit;
+        }
+        
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!isset($data['blocks']) || !is_array($data['blocks'])) {
