@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { InstancedMesh } from 'three';
 
 // Weltgrößen-Konstanten anpassen
@@ -8,11 +7,6 @@ const BLOCK_SIZE = 1;
 const MIN_HEIGHT = -60;
 const MAX_HEIGHT = 40; // Erhöht für Hügel
 const WATER_LEVEL = 0; // Wasserhöhe
-
-// Stats für FPS-Anzeige
-const stats = new Stats();
-stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.body.appendChild(stats.dom);
 
 // Szene erstellen
 const scene = new THREE.Scene();
@@ -56,7 +50,7 @@ const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 // Blocktypen erweitern
 const BLOCK_TYPES = {
     'grass': { 
-        material: new THREE.MeshStandardMaterial({ color: 0x3d9e3d }), 
+        material: new THREE.MeshStandardMaterial({ color: 0x556B2F }), // Olivgrün
         probability: 0.4,
         minHeight: -1,
         maxHeight: MAX_HEIGHT
@@ -127,6 +121,41 @@ let moveLeft = false;
 let moveRight = false;
 let canJump = false;
 
+// Neue Konstanten für die Kamera-Positionen
+const CAMERA_POSITIONS = {
+    SOUTH: 0,      // 0°
+    SOUTH_EAST: 1, // 45°
+    EAST: 2,       // 90°
+    NORTH_EAST: 3, // 135°
+    NORTH: 4,      // 180°
+    NORTH_WEST: 5, // 225°
+    WEST: 6,       // 270°
+    SOUTH_WEST: 7  // 315°
+};
+
+// Aktuelle Kamera-Position
+let currentCameraPosition = CAMERA_POSITIONS.SOUTH;
+
+// Neue Konstanten für Zoom
+const MIN_ZOOM = 8;  // Minimale Distanz
+const MAX_ZOOM = 25; // Maximale Distanz
+let currentZoom = 15; // Aktuelle Distanz (startet bei 15)
+
+// Event-Listener für Mausrad
+document.addEventListener('wheel', (event) => {
+    // Zoom-Geschwindigkeit
+    const zoomSpeed = 0.5;
+    
+    // Zoom basierend auf Mausrad-Richtung
+    if (event.deltaY > 0) {
+        // Rauszoomen
+        currentZoom = Math.min(currentZoom + zoomSpeed, MAX_ZOOM);
+    } else {
+        // Reinzoomen
+        currentZoom = Math.max(currentZoom - zoomSpeed, MIN_ZOOM);
+    }
+});
+
 // Tastatur-Event-Listener
 document.addEventListener('keydown', (event) => {
     switch (event.code) {
@@ -134,6 +163,12 @@ document.addEventListener('keydown', (event) => {
         case 'KeyS': moveBackward = true; break;
         case 'KeyA': moveLeft = true; break;
         case 'KeyD': moveRight = true; break;
+        case 'KeyQ': // Gegen den Uhrzeigersinn drehen
+            currentCameraPosition = (currentCameraPosition + 7) % 8;
+            break;
+        case 'KeyE': // Im Uhrzeigersinn drehen
+            currentCameraPosition = (currentCameraPosition + 1) % 8;
+            break;
         case 'Space': if (canJump) {
             playerVelocity.y = JUMP_FORCE;
             canJump = false;
@@ -173,30 +208,32 @@ function checkBlockCollision(position) {
 function updatePlayerMovement() {
     if (!playerMesh) return;
 
-    // Bewegungsrichtung basierend auf Kamera-Rotation
-    const cameraDirection = new THREE.Vector3();
-    camera.getWorldDirection(cameraDirection);
-    const angle = Math.atan2(cameraDirection.x, cameraDirection.z);
-
+    // Bewegungsrichtung basierend auf Kamera-Position
+    const angle = (currentCameraPosition * Math.PI / 4);
+    
     // Horizontale Bewegung
     let moveX = 0;
     let moveZ = 0;
 
     if (moveForward) {
-        moveX += Math.sin(angle) * MOVEMENT_SPEED;
-        moveZ += Math.cos(angle) * MOVEMENT_SPEED;
+        moveX -= Math.sin(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        moveZ -= Math.cos(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        playerMesh.rotation.y = angle + Math.PI;    // 180° gedreht
     }
     if (moveBackward) {
-        moveX -= Math.sin(angle) * MOVEMENT_SPEED;
-        moveZ -= Math.cos(angle) * MOVEMENT_SPEED;
+        moveX += Math.sin(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        moveZ += Math.cos(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        playerMesh.rotation.y = angle;              // Nicht gedreht
     }
     if (moveLeft) {
-        moveX += Math.cos(angle) * MOVEMENT_SPEED;
-        moveZ -= Math.sin(angle) * MOVEMENT_SPEED;
+        moveX -= Math.cos(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        moveZ += Math.sin(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        playerMesh.rotation.y = angle + Math.PI/2;  // 90° gedreht
     }
     if (moveRight) {
-        moveX -= Math.cos(angle) * MOVEMENT_SPEED;
-        moveZ += Math.sin(angle) * MOVEMENT_SPEED;
+        moveX += Math.cos(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        moveZ -= Math.sin(angle) * MOVEMENT_SPEED;  // Vorzeichen umgedreht
+        playerMesh.rotation.y = angle - Math.PI/2;  // -90° gedreht
     }
 
     // Gravitation
@@ -240,46 +277,30 @@ function updatePlayerMovement() {
     }
 }
 
-// Position-Update-Timer
-let lastUpdateTime = Date.now();
-
-// Positions-Update zur Datenbank
-function updatePlayerPositionInDB() {
-    const currentTime = Date.now();
-    if (currentTime - lastUpdateTime >= 5000) { // Alle 5 Sekunden
-        lastUpdateTime = currentTime;
-        updatePlayerPosition();
-    }
-}
-
-// Initial-Kamera-Position (von oben)
-function setInitialCamera() {
-    camera.position.set(
-        WORLD_SIZE * 0.5,  // Zentrum X
-        WORLD_SIZE * 1,    // Höhe
-        WORLD_SIZE * 1.5   // Abstand
-    );
-    camera.lookAt(WORLD_SIZE * 0.5, -WORLD_SIZE * 0.2, WORLD_SIZE * 0.5);
-    controls.target.set(WORLD_SIZE * 0.5, 0, WORLD_SIZE * 0.5);
-}
-
-// Kamera-Follow für Spieler
+// Kamera-Follow für Spieler (vereinfacht)
 function updateCamera() {
-    if (playerMesh && playerName) { // Nur updaten wenn Spieler existiert und eingeloggt
-        // Aktuelle Kamera-Distanz zum Target beibehalten
-        const currentDistance = camera.position.distanceTo(controls.target);
+    if (playerMesh && playerName) {
+        const height = currentZoom * 0.8;  // Höhe proportional zum Zoom
+        const distance = currentZoom;      // Abstand = Zoom-Level
         
-        // Setze das Target auf die Spielerposition
-        controls.target.copy(playerMesh.position);
+        // Berechne Winkel basierend auf aktueller Position
+        const angle = (currentCameraPosition * Math.PI / 4);
         
-        // Berechne neue Kamera-Position basierend auf aktueller Rotation und Distanz
-        const theta = controls.getAzimuthalAngle();
-        const phi = controls.getPolarAngle();
+        // Berechne neue Kamera-Position
+        const x = playerMesh.position.x + Math.sin(angle) * distance;
+        const z = playerMesh.position.z + Math.cos(angle) * distance;
         
         camera.position.set(
-            playerMesh.position.x + currentDistance * Math.sin(phi) * Math.sin(theta),
-            playerMesh.position.y + currentDistance * Math.cos(phi),
-            playerMesh.position.z + currentDistance * Math.sin(phi) * Math.cos(theta)
+            x,
+            playerMesh.position.y + height,
+            z
+        );
+        
+        // Kamera schaut immer auf den Spieler, aber etwas über Bodenhöhe
+        camera.lookAt(
+            playerMesh.position.x,
+            playerMesh.position.y + 1,
+            playerMesh.position.z
         );
     }
 }
@@ -293,80 +314,25 @@ function createPlayer(x, y, z, rotationY) {
         emissiveIntensity: 0.5
     });
     playerMesh = new THREE.Mesh(geometry, material);
-    playerMesh.position.set(x, y + 0.9, z);
-    playerMesh.rotation.y = rotationY;
-    scene.add(playerMesh);
     
-    // Sanfter Übergang zur Spieler-Perspektive
-    const startPosition = camera.position.clone();
-    const startTarget = controls.target.clone();
-    const endPosition = new THREE.Vector3(x - 10, y + 5, z - 10);
-    const endTarget = playerMesh.position;
-    
-    // Animation der Kamera-Transition
-    const duration = 2000; // 2 Sekunden
-    const startTime = Date.now();
-    
-    function animateCamera() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Smooth-Step-Funktion für sanftere Bewegung
-        const t = progress * progress * (3 - 2 * progress);
-        
-        camera.position.lerpVectors(startPosition, endPosition, t);
-        controls.target.lerpVectors(startTarget, endTarget, t);
-        
-        if (progress < 1) {
-            requestAnimationFrame(animateCamera);
-        }
-    }
-    
-    animateCamera();
-    
-    console.log('Spieler erstellt an Position:', x, y, z);
-
     // Finde höchsten Block unter Spielerposition
     let spawnY = y;
     for (let checkY = MAX_HEIGHT; checkY >= MIN_HEIGHT; checkY--) {
         const key = `${Math.floor(x)},${checkY},${Math.floor(z)}`;
         if (tempBlocks.has(key)) {
-            console.log('Spawn-Block gefunden bei Y:', checkY);
             spawnY = checkY + 2;
             break;
         }
     }
 
     playerMesh.position.set(x, spawnY, z);
-    console.log('Spieler platziert bei:', x, spawnY, z);
-}
-
-// Spieler Position aktualisieren
-async function updatePlayerPosition() {
-    if (!playerMesh || !playerName) return;
+    playerMesh.rotation.y = rotationY;
+    scene.add(playerMesh);
     
-    try {
-        const response = await fetch(`http://pokemon-clon.local?updatePlayer`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                name: playerName,
-                x: playerMesh.position.x,
-                y: playerMesh.position.y - 0.9,
-                z: playerMesh.position.z,
-                rotation_y: playerMesh.rotation.y
-            })
-        });
-        
-        const data = await response.json();
-        if (!data.success) {
-            console.error('Fehler beim Speichern der Position');
-        }
-    } catch (error) {
-        console.error('Fehler beim Aktualisieren der Spielerposition:', error);
-    }
+    // Direkte Kamera-Positionierung ohne Animation
+    updateCamera();
+    
+    console.log('Spieler erstellt an Position:', x, spawnY, z);
 }
 
 // Spieler laden/erstellen anpassen
@@ -376,16 +342,44 @@ async function loadPlayer(name) {
         const data = await response.json();
         if (data.success) {
             playerName = name;
-            console.log('Lade Spieler:', data.player); // Debug-Log
             createPlayer(
                 data.player.x, 
-                data.player.y + 2, // Etwas höher setzen
+                data.player.y + 2,
                 data.player.z, 
                 data.player.rotation_y
             );
             
+            // Kamera-Position wiederherstellen
+            currentCameraPosition = data.player.camera_position || CAMERA_POSITIONS.SOUTH;
+            
             // Starte Positions-Update-Intervall
-            setInterval(updatePlayerPosition, 5000);
+            setInterval(async () => {
+                if (playerMesh) {
+                    try {
+                        const response = await fetch(`http://pokemon-clon.local?updatePlayer`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                name: playerName,
+                                x: playerMesh.position.x,
+                                y: playerMesh.position.y - 0.9,
+                                z: playerMesh.position.z,
+                                rotation_y: playerMesh.rotation.y,
+                                camera_position: currentCameraPosition // Neue Kamera-Position
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (!data.success) {
+                            console.error('Fehler beim Speichern der Position');
+                        }
+                    } catch (error) {
+                        console.error('Fehler beim Aktualisieren der Spielerposition:', error);
+                    }
+                }
+            }, 5000);
         }
     } catch (error) {
         console.error('Fehler beim Laden des Spielers:', error);
@@ -531,20 +525,15 @@ async function loadAndDisplayWorld() {
     }
 }
 
-// OrbitControls anpassen
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.maxPolarAngle = Math.PI / 2.1;
-controls.minPolarAngle = Math.PI / 6;
-controls.minDistance = 5;
-controls.maxDistance = 20;
-controls.enableRotate = true;
-controls.enableZoom = true;
-controls.enablePan = false;
-
-// Initial-Kamera setzen
-setInitialCamera();
+// Initial-Kamera-Position anpassen
+function setInitialCamera() {
+    camera.position.set(
+        WORLD_SIZE * 0.5,  // Zentrum X
+        WORLD_SIZE * 0.5,  // Höhe
+        WORLD_SIZE * 0.75  // Etwas südlich vom Zentrum
+    );
+    camera.lookAt(WORLD_SIZE * 0.5, 0, WORLD_SIZE * 0.5);
+}
 
 // Kompass-Logik
 const compassNeedle = document.getElementById('compass-needle');
@@ -562,19 +551,40 @@ function updateCompass() {
     compassNeedle.style.transform = `rotate(${angle}deg)`;
 }
 
+// Koordinaten-Update-Funktion
+function updateCoordinates() {
+    if (playerMesh) {
+        const coords = document.getElementById('coordinates');
+        coords.textContent = `X: ${Math.round(playerMesh.position.x)} Y: ${Math.round(playerMesh.position.y)} Z: ${Math.round(playerMesh.position.z)}`;
+    }
+}
+
+// Neue FPS-Berechnung
+let lastTime = performance.now();
+let frameCount = 0;
+
+// FPS-Update-Funktion
+function updateFPS() {
+    const fpsDisplay = document.getElementById('fps');
+    const currentTime = performance.now();
+    frameCount++;
+
+    if (currentTime >= lastTime + 1000) {
+        fpsDisplay.textContent = `FPS: ${frameCount}`;
+        frameCount = 0;
+        lastTime = currentTime;
+    }
+}
+
 // Animation-Loop anpassen
 function animate() {
-    stats.begin();
-    
     requestAnimationFrame(animate);
-    controls.update();
     updateCompass();
     updateCamera();
-    updatePlayerMovement(); // Bewegung updaten
-    updatePlayerPositionInDB(); // DB-Update prüfen
+    updatePlayerMovement();
+    updateCoordinates();
+    updateFPS();
     renderer.render(scene, camera);
-    
-    stats.end();
 }
 
 // Fenster-Resize-Handler
@@ -583,5 +593,125 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Nach der Szenen-Erstellung und vor der Kamera
+// Himmel erstellen
+const vertexShader = `
+varying vec3 vWorldPosition;
+
+void main() {
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const fragmentShader = `
+uniform vec3 topColor;
+uniform vec3 bottomColor;
+uniform float offset;
+uniform float exponent;
+
+varying vec3 vWorldPosition;
+
+void main() {
+    float h = normalize(vWorldPosition + offset).y;
+    gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+}`;
+
+const uniforms = {
+    topColor: { value: new THREE.Color(0x0077ff) },    // Hellblau
+    bottomColor: { value: new THREE.Color(0xffffff) }, // Weiß
+    offset: { value: 33 },
+    exponent: { value: 0.6 }
+};
+
+const skyGeo = new THREE.SphereGeometry(WORLD_SIZE * 2, 32, 15);
+const skyMat = new THREE.ShaderMaterial({
+    uniforms: uniforms,
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    side: THREE.BackSide
+});
+
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
+
+// Anpassen der Szenenbeleuchtung für bessere Atmosphäre
+scene.fog = new THREE.Fog(0xffffff, WORLD_SIZE * 0.1, WORLD_SIZE * 1.5);
+renderer.setClearColor(0x87ceeb); // Hellblauer Fallback
+
+// Beleuchtung anpassen
+directionalLight.intensity = 1.2; // Helleres Sonnenlicht
+ambientLight.intensity = 0.4;    // Dunkleres Umgebungslicht für mehr Kontrast
+
+// Neue Variablen für andere Spieler
+const otherPlayers = new Map(); // Speichert andere Spieler-Meshes mit Namen als Key
+
+// Farben für andere Spieler
+const PLAYER_COLORS = [
+    0x00ff00,  // Grün
+    0x0000ff,  // Blau
+    0xffff00,  // Gelb
+    0xff00ff,  // Magenta
+    0x00ffff,  // Cyan
+    0xffa500   // Orange
+];
+
+// Funktion zum Erstellen eines Spieler-Meshes
+function createPlayerMesh(color) {
+    const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1.8, 32);
+    const material = new THREE.MeshStandardMaterial({ 
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.5
+    });
+    return new THREE.Mesh(geometry, material);
+}
+
+// Funktion zum Aktualisieren anderer Spieler
+async function updateOtherPlayers() {
+    try {
+        const response = await fetch(`http://pokemon-clon.local?getAllPlayers`);
+        const data = await response.json();
+        
+        if (data.success && data.players) {
+            // Aktuelle Spielerliste
+            const currentPlayers = new Set(data.players.map(p => p.name));
+            
+            // Entferne nicht mehr vorhandene Spieler
+            for (const [name, mesh] of otherPlayers) {
+                if (!currentPlayers.has(name) || name === playerName) {
+                    scene.remove(mesh);
+                    otherPlayers.delete(name);
+                }
+            }
+            
+            // Aktualisiere oder erstelle andere Spieler
+            let colorIndex = 0;
+            for (const player of data.players) {
+                if (player.name !== playerName) {
+                    let playerMesh = otherPlayers.get(player.name);
+                    
+                    if (!playerMesh) {
+                        // Erstelle neuen Spieler
+                        playerMesh = createPlayerMesh(PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]);
+                        otherPlayers.set(player.name, playerMesh);
+                        scene.add(playerMesh);
+                        colorIndex++;
+                    }
+                    
+                    // Aktualisiere Position
+                    playerMesh.position.set(player.x, player.y + 0.9, player.z);
+                    playerMesh.rotation.y = player.rotation_y;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren anderer Spieler:', error);
+    }
+}
+
+// Starte Update-Intervall für andere Spieler
+setInterval(updateOtherPlayers, 1000);
 
 animate(); 
